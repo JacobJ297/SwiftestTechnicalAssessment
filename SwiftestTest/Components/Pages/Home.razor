@@ -1,0 +1,145 @@
+﻿@page "/"
+@rendermode InteractiveServer
+
+<h3 class="title">Hip Roof Calculator</h3>
+
+<div class="calc">
+    <div class="row">
+        <div class="input-group">
+            <p>Enter roof <strong>length</strong> m</p>
+            <input type="number" min="0" @bind="length" />
+        </div>
+        <div class="input-group">
+            <p>Enter roof <strong>width</strong> m:</p>
+            <input type="number" min="0" @bind="width"  />
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="input-group">
+            <p>Enter roof <strong>hip end</strong> pitch °:</p>
+            <input type="number" min ="0" max="90" @bind="angle1Degrees"  />
+        </div>
+        <div class="input-group">
+            <p>Enter roof <strong>main</strong> pitch °:</p>
+            <input type="number" min="0" max="90" @bind="angle2Degrees"  />
+        </div>
+    </div>
+</div>
+
+@if (IsValidInput)
+{
+    <p style="text-align: center;">
+        The <span class="answer">hip rafter length</span> of this roof is @HipLength.ToString("F2") m
+    </p>
+
+    <!-- Diagram -->
+    <div class="roof-container">
+        <div class="roof" style="@RoofStyle">
+            <!-- Ridge Line -->
+            <div class="ridge" style="@RidgeStyle"></div>
+
+            <!-- Diagonals -->
+            <div class="diagonal" style="@DrawLine(RidgeLeftX, RidgeY, 0, 0)"></div>
+            <div class="diagonal" style="@DrawLine(RidgeLeftX, RidgeY, 0, width)"></div>
+            <div class="diagonal" style="@DrawLine(RidgeRightX, RidgeY, length, 0)"></div>
+            <div class="diagonal" style="@DrawLine(RidgeRightX, RidgeY, length, width)"></div>
+
+            <!-- Labels -->
+            <div class="label ridge-label" style="@RidgeLabelStyle">
+                Ridge length: @ridgeWidth.ToString("F2") m
+            </div>
+            <div class="label ridge-label" style="@RidgeLabelStyle2">
+                Ridge height: @height.ToString("F2") m
+            </div>
+            <div class="label hip-label" style="@HipLabelStyle">
+                Hip: @HipLength.ToString("F2") m
+            </div>
+            <div class="label width-label" style="@WidthLabelStyle">
+                Width: @(width) m
+            </div>
+            <div class="label length-label" style="@LengthLabelStyle">
+                Length: @(length) m
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <p style="text-align: center; font-size: 1.5rem; margin-top: 60px; color: black;">
+        Roof is not possible with these dimensions and angles.
+    </p>
+}
+
+@code {
+    // Input parameters for the roof dimensions and angles
+    private double width = 5;
+    private double length = 10;
+    private double angle1Degrees = 35;
+    private double angle2Degrees = 45;
+
+    private double angle1 => (Math.PI / 180) * angle1Degrees; // convert degrees to radians for calculations
+    private double angle2 => (Math.PI / 180) * angle2Degrees;
+
+    // Hip length calculation
+    private double height => Math.Tan(angle2) * (width / 2);
+    private double ridgeWidth => length - 2*(height / Math.Tan(angle1));
+    private double z => Math.Sqrt(
+        Math.Pow(height / Math.Tan(angle1), 2) +
+        Math.Pow(height / Math.Tan(angle2), 2)
+    );  // length of flat line below hip rafter
+    private double HipLength => Math.Sqrt(Math.Pow(z, 2) + Math.Pow(height, 2));  // hip rafter length
+
+    private double RidgeY => width / 2;
+    private double RidgeLeftX => (length - ridgeWidth) / 2;
+    private double RidgeRightX => (length + ridgeWidth) / 2;
+    private const double scale = 50;  // scale factor for rendering
+
+    private string RoofStyle =>
+        $"position: relative; width: {length * scale}px; height: {width * scale}px; background: #eee; border: 2px solid #333;";
+
+    private string RidgeStyle =>
+        $"position: absolute; top: {RidgeY * scale}px; left: {RidgeLeftX * scale}px; width: {ridgeWidth * scale}px; height: 2px; background-color: black;";
+
+    private string DrawLine(double x1, double y1, double x2, double y2)   // function to generate diagonal lines in diagram
+    {
+        var dx = x2 - x1;
+        var dy = y2 - y1;
+        var length2 = Math.Sqrt(dx * dx + dy * dy);
+        var angle = Math.Atan2(dy, dx) * (180 / Math.PI);
+
+        return $"position: absolute; " +
+               $"top: {y1 * scale}px; left: {x1 * scale}px; " +
+               $"width: {length2 * scale}px; height: 2px; " +
+               $"background: red; " +
+               $"transform: rotate({angle}deg); " +
+               $"transform-origin: left center;";
+    }
+
+    private double HipAngle => Math.Atan2(RidgeY, RidgeLeftX) * (180 / Math.PI);
+    // label styling
+    private string RidgeLabelStyle =>
+        $"top: {scale * RidgeY - 25}px; left: {scale * (RidgeLeftX + ridgeWidth / 2) - 67}px;";
+
+    private string RidgeLabelStyle2 =>
+        $"top: {scale * RidgeY + 7}px; left: {scale * (RidgeLeftX + ridgeWidth / 2) - 67}px;";
+
+    private string HipLabelStyle =>
+        $"top: {scale * (RidgeY + RidgeY / 2) - 10}px; left: {scale * (RidgeLeftX - RidgeLeftX / 2)}px; " +
+        $"transform: rotate({-HipAngle}deg); transform-origin: left center;";
+
+    private string WidthLabelStyle =>
+        $"top: {scale * width / 2 - 10}px; left: {scale * length + 10}px;";
+
+    private string LengthLabelStyle =>
+        $"top: -30px; left: {(scale * length) / 2 - 50}px;";
+
+    // check inputs are valid otherwise display error message
+
+    private bool IsValidInput =>
+        angle1Degrees > 0 && angle1Degrees < 90 &&
+        angle2Degrees > 0 && angle2Degrees < 90 &&
+        length >= width && ridgeWidth >= -0.01;   // allow for rounding errors
+
+  
+}
